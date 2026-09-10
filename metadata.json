@@ -1,0 +1,6 @@
+{
+  "name": "EcoBuddy AI",
+  "description": "An AI-powered environmental assistant for waste segregation, recycling, composting, and eco-friendly practices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
