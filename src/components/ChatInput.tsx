@@ -298,7 +298,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }`}>
           <span className="hidden sm:inline">Press Enter to send, Shift+Enter for newline</span>
           <span className="flex items-center gap-1 ml-auto font-medium">
-            <AlertCircle className="w-3 h-3 text-[#2D5A27] dark:text-emerald-400" /> Powered by Gemini 3.6 Flash
+            <AlertCircle className="w-3 h-3 text-[#2D5A27] dark:text-emerald-400" /> Powered by Gemini 3.8 Flash
           </span>
         </div>
 

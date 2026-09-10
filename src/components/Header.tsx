@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
                     EcoBuddy <span className="text-emerald-300">AI</span>
                   </h1>
                   <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-white/10 border border-white/20 text-emerald-200 rounded-full">
-                    <Sparkles className="w-2.5 h-2.5" /> Gemini 3.6 Flash
+                    <Sparkles className="w-2.5 h-2.5" /> Gemini 3.8 Flash
                   </span>
                 </div>
               </div>

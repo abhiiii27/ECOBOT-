@@ -24,6 +24,7 @@ interface ChatMessageProps {
   darkMode: boolean;
   onRegenerate?: () => void;
   onFeedback?: (messageId: string, type: 'like' | 'dislike') => void;
+  onRetry?: () => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -31,6 +32,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   darkMode,
   onRegenerate,
   onFeedback,
+  onRetry,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -151,11 +153,29 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
             {!isUser && (
               <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                darkMode
-                  ? 'bg-[#253B23] text-emerald-300 border-[#294226]'
-                  : 'bg-[#EBF2EA] text-[#2D5A27] border-[#D8DFD5]'
+                message.isError
+                  ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                  : message.source === 'knowledge_fallback'
+                    ? darkMode
+                      ? 'bg-amber-900/20 text-amber-300 border-amber-700/30'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                    : darkMode
+                      ? 'bg-[#253B23] text-emerald-300 border-[#294226]'
+                      : 'bg-[#EBF2EA] text-[#2D5A27] border-[#D8DFD5]'
               }`}>
-                <Sparkles className="w-2.5 h-2.5" /> Gemini AI
+                {message.isError ? (
+                  <>
+                    <AlertCircle className="w-2.5 h-2.5" /> Notice
+                  </>
+                ) : message.source === 'knowledge_fallback' ? (
+                  <>
+                    <Leaf className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> Eco Knowledge
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Gemini AI
+                  </>
+                )}
               </span>
             )}
           </div>
@@ -293,8 +313,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 </button>
               )}
 
-              {/* Regenerate Button */}
-              {onRegenerate && (
+              {/* Regenerate or Retry Button */}
+              {onRetry && message.isError ? (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500 text-white hover:bg-rose-600 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Try Again
+                </button>
+              ) : onRegenerate ? (
                 <button
                   type="button"
                   onClick={onRegenerate}
@@ -307,7 +335,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
-              )}
+              ) : null}
 
               {/* Copy Button */}
               <button

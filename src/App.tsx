@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, ChatSession, AppSettings } from './types';
-import { sendChatMessage } from './services/api';
+import { sendChatMessage, sanitizeErrorMessage } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -11,7 +11,7 @@ import { BinGuideModal } from './components/BinGuideModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AboutModal } from './components/AboutModal';
 import { ConfirmModal } from './components/ConfirmModal';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -173,7 +173,7 @@ export default function App() {
         .slice(-10)
         .map((m) => ({ sender: m.sender, text: m.text }));
 
-      const replyText = await sendChatMessage({
+      const { reply: replyText, source } = await sendChatMessage({
         message: text,
         history: historyPayload,
         imageBase64,
@@ -185,6 +185,7 @@ export default function App() {
         sender: 'assistant',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        source,
       };
 
       setSessions((prev) =>
@@ -196,15 +197,30 @@ export default function App() {
       );
     } catch (err: any) {
       console.error('EcoBuddy Chat Error:', err);
-      setErrorMessage(
-        err.message || 'Unable to connect to EcoBuddy AI. Please try again.'
+      const errMsg = sanitizeErrorMessage(err);
+      setErrorMessage(errMsg);
+
+      const assistantErrorMsg: Message = {
+        id: `msg-${Date.now() + 1}`,
+        sender: 'assistant',
+        text: `⚠️ **EcoBuddy Connection Notice**\n\nI couldn't reach the AI service right now:\n> *${errMsg}*\n\n**To resolve:**\n1. Ensure \`GEMINI_API_KEY\` is configured in your project settings.\n2. Tap **Try Again** below to retry this prompt.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isError: true,
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? { ...s, messages: [...s.messages, assistantErrorMsg] }
+            : s
+        )
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Regenerate response for last user prompt
+  // Regenerate response for last user prompt or pending query
   const handleRegenerate = async () => {
     if (messages.length === 0 || isLoading) return;
 
@@ -218,13 +234,22 @@ export default function App() {
     setIsLoading(true);
     setErrorMessage(null);
 
+    // Remove any trailing assistant error messages
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== currentSessionId) return s;
+        const cleaned = s.messages.filter((m, idx) => idx <= actualIndex || !m.isError);
+        return { ...s, messages: cleaned };
+      })
+    );
+
     try {
       const historyPayload = messages
         .slice(0, actualIndex)
         .slice(-10)
         .map((m) => ({ sender: m.sender, text: m.text }));
 
-      const replyText = await sendChatMessage({
+      const { reply: replyText, source } = await sendChatMessage({
         message: lastUserMessage.text,
         history: historyPayload,
         imageBase64: lastUserMessage.imagePreview,
@@ -235,9 +260,10 @@ export default function App() {
         sender: 'assistant',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        source,
       };
 
-      // Replace or append response
+      // Replace or append response cleanly
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id !== currentSessionId) return s;
@@ -252,10 +278,15 @@ export default function App() {
       );
     } catch (err: any) {
       console.error('Regenerate Error:', err);
-      setErrorMessage(err.message || 'Failed to regenerate response.');
+      setErrorMessage(sanitizeErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Retry delegates to handleRegenerate to avoid creating duplicate user messages
+  const handleRetry = () => {
+    handleRegenerate();
   };
 
   // Handle message feedback
@@ -330,18 +361,27 @@ export default function App() {
             
             {/* Error Banner */}
             {errorMessage && (
-              <div className="mb-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-sm flex items-center justify-between gap-3 animate-fade-in shadow-sm shrink-0">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 shrink-0" />
-                  <span>{errorMessage}</span>
+              <div className="mb-4 p-3.5 sm:p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs sm:text-sm flex items-center justify-between gap-3 animate-fade-in shadow-sm shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-rose-500" />
+                  <span className="truncate">{sanitizeErrorMessage(errorMessage)}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setErrorMessage(null)}
-                  className="p-1 hover:bg-rose-500/20 rounded-lg text-xs font-semibold underline shrink-0 cursor-pointer"
-                >
-                  Dismiss
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="px-2.5 py-1 rounded-xl bg-rose-500 text-white font-bold text-xs hover:bg-rose-600 transition-colors cursor-pointer shadow-xs"
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setErrorMessage(null)}
+                    className="px-2 py-1 text-xs hover:bg-rose-500/20 rounded-lg underline cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             )}
 
@@ -360,8 +400,25 @@ export default function App() {
                     darkMode={darkMode}
                     onRegenerate={msg.sender === 'assistant' ? handleRegenerate : undefined}
                     onFeedback={handleFeedback}
+                    onRetry={handleRetry}
                   />
                 ))}
+
+                {/* If the last message is an unanswered user query and not loading, show direct answer action */}
+                {messages.length > 0 &&
+                  messages[messages.length - 1].sender === 'user' &&
+                  !isLoading && (
+                    <div className="flex justify-end pr-2 pt-1 pb-2">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2D5A27] hover:bg-[#23481F] text-white text-xs font-bold shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Generate Answer</span>
+                      </button>
+                    </div>
+                  )}
 
                 {/* Loading State */}
                 {isLoading && <LoadingIndicator darkMode={darkMode} />}

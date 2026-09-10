@@ -6,6 +6,8 @@ export interface Message {
   imagePreview?: string;
   categoryTag?: 'dry' | 'wet' | 'hazardous' | 'ewaste' | 'residual' | 'tip';
   feedback?: 'like' | 'dislike' | null;
+  isError?: boolean;
+  source?: 'gemini' | 'knowledge_fallback';
 }
 
 export interface ChatSession {
